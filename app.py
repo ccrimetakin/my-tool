@@ -6,14 +6,13 @@ import io
 # Page Configuration
 st.set_page_config(page_title="AI Pro Background Remover", layout="centered")
 
-# Custom CSS for better look
+# CSS Fix: unsafe_allow_html use hota hai
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; border-radius: 20px; height: 3em; background-color: #007bff; color: white; }
+    .stButton>button { width: 100%; border-radius: 20px; background-color: #007bff; color: white; }
     .stDownloadButton>button { width: 100%; border-radius: 20px; background-color: #28a745; color: white; }
     </style>
-    """, unsafe_content_html=True)
+    """, unsafe_allow_html=True)
 
 st.title("✨ AI Photo Professional")
 st.write("Professional photos banayein sirf ek click mein!")
@@ -26,7 +25,6 @@ bg_color = "#FFFFFF"
 if choice == "Solid Color":
     bg_color = st.sidebar.color_picker("Color Chuniye", "#0000FF")
     
-    # Quick Presets
     st.sidebar.write("Quick Colors:")
     if st.sidebar.button("Passport Blue"): bg_color = "#0000FF"
     if st.sidebar.button("Plain White"): bg_color = "#FFFFFF"
@@ -42,11 +40,10 @@ if upload:
     col1, col2 = st.columns(2)
     img = Image.open(upload)
     with col1:
-        st.image(img, caption="Original Image")
+        st.image(img, caption="Original Image", use_container_width=True)
     
     if st.button("Magic Process Shuru Karein"):
-        with st.spinner("AI Background Hatane Mein Busy Hai..."):
-            # Process
+        with st.spinner("Processing..."):
             img_bytes = upload.getvalue()
             res_bytes = remove(img_bytes)
             subject = Image.open(io.BytesIO(res_bytes)).convert("RGBA")
@@ -59,9 +56,8 @@ if upload:
                 final = subject
 
             with col2:
-                st.image(final, caption="Result")
+                st.image(final, caption="Result", use_container_width=True)
             
-            # Download
             buf = io.BytesIO()
             if choice == "Solid Color":
                 final.save(buf, format="JPEG")
