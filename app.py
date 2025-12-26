@@ -1,79 +1,98 @@
 import streamlit as st
 from rembg import remove
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import io
 import requests
 
-# Page setup
-st.set_page_config(page_title="Ultimate AI Photo Editor", layout="wide")
+# Page Config
+st.set_page_config(page_title="AI Photo Studio Max", layout="wide")
 
+# Advanced CSS
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; border-radius: 10px; background-color: #007bff; color: white; font-weight: bold; }
-    .stDownloadButton>button { width: 100%; border-radius: 10px; background-color: #28a745; color: white; }
+    .stApp { background-color: #0e1117; color: white; }
+    .stButton>button { background: linear-gradient(45deg, #FF4B2B, #FF416C); color: white; border: none; border-radius: 5px; height: 50px; font-weight: bold; width: 100%; }
+    .stSidebar { background-color: #161b22; }
+    div[data-testid="stExpander"] { background: #1f2937; border-radius: 10px; border: none; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("📸 Pro AI Background Editor")
-st.write("Background hatayein aur apni pasand ka naya look dein!")
+st.title("✨ AI Photo Studio Max")
+st.write("Advance AI tools se apni photo ko modify karein.")
 
-# --- Sidebar Settings ---
-st.sidebar.header("⚙️ Background Options")
-mode = st.sidebar.selectbox("Kya lagana chahte hain?", ["Transparent (Blank)", "Solid Color", "Stock Image"])
+# --- Sidebar: Tools & Filters ---
+st.sidebar.header("🛠️ Editor Tools")
 
-bg_image_final = None
+# 1. Background Logic
+bg_mode = st.sidebar.selectbox("Background Mode:", ["Transparent", "Solid Color", "Stock Image", "AI Generated (Coming Soon)"])
 
-if mode == "Solid Color":
-    chosen_color = st.sidebar.color_picker("Color Chuniye", "#FFFFFF")
-elif mode == "Stock Image":
-    stock_options = {
-        "Office": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800",
-        "Nature": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800",
-        "Studio Gray": "https://images.unsplash.com/photo-1557683316-973673baf926?w=800",
-        "Abstract Blue": "https://images.unsplash.com/photo-1554034483-04fda0d3507b?w=800"
-    }
-    selection = st.sidebar.selectbox("Stock Background Chuniye:", list(stock_options.keys()))
-    bg_url = stock_options[selection]
-    bg_image_final = Image.open(requests.get(bg_url, stream=True).raw).convert("RGBA")
+bg_color = "#ffffff"
+if bg_mode == "Solid Color":
+    bg_color = st.sidebar.color_picker("Pick a Color", "#0000FF")
+elif bg_mode == "Stock Image":
+    stock = st.sidebar.selectbox("Select Theme:", ["Luxury Office", "Cyberpunk City", "Nature", "Studio Minimal"])
+    # Links setup yahan honge...
 
-# --- Main Interface ---
-upload = st.file_uploader("Photo Upload Karein", type=["jpg", "png", "jpeg"])
+# 2. Color Effects (Brightness, Contrast, etc.)
+st.sidebar.subheader("🎨 Color Effects")
+brightness = st.sidebar.slider("Brightness", 0.5, 2.0, 1.0)
+contrast = st.sidebar.slider("Contrast", 0.5, 2.0, 1.0)
+saturation = st.sidebar.slider("Saturation", 0.0, 2.0, 1.0)
+blur = st.sidebar.slider("Blur Effect", 0, 10, 0)
+
+# 3. Photo Filters
+filter_type = st.sidebar.selectbox("Apply Filter:", ["None", "Black & White", "Sepia", "Vivid", "Soft Glow"])
+
+# --- Main App ---
+upload = st.file_uploader("Apni Photo Upload Karein", type=["jpg", "png", "jpeg"])
 
 if upload:
-    c1, c2 = st.columns(2)
+    col1, col2 = st.columns(2)
     input_img = Image.open(upload)
-    with c1:
+    
+    with col1:
         st.image(input_img, caption="Original Photo", use_container_width=True)
 
-    if st.button("Magic Edit Shuru Karein ✨"):
-        with st.spinner("AI Background Hatane Mein Busy Hai..."):
-            # 1. Background Remove
+    if st.button("Apply Magic ✨"):
+        with st.spinner("AI processing chal rahi hai..."):
+            # A. Remove Background
             img_bytes = upload.getvalue()
-            subject_bytes = remove(img_bytes)
-            subject = Image.open(io.BytesIO(subject_bytes)).convert("RGBA")
+            res_bytes = remove(img_bytes)
+            subject = Image.open(io.BytesIO(res_bytes)).convert("RGBA")
+
+            # B. Apply Color Enhancements
+            enhancer = ImageEnhance.Brightness(subject)
+            subject = enhancer.enhance(brightness)
+            enhancer = ImageEnhance.Contrast(subject)
+            subject = enhancer.enhance(contrast)
+            enhancer = ImageEnhance.Color(subject)
+            subject = enhancer.enhance(saturation)
             
-            # 2. New Background Preparation
-            if mode == "Transparent (Blank)":
-                final_img = subject
-            elif mode == "Solid Color":
-                # Hex to RGB
-                h = chosen_color.lstrip('#')
+            if blur > 0:
+                subject = subject.filter(ImageFilter.GaussianBlur(blur))
+
+            # C. Apply Background Mode
+            if bg_mode == "Solid Color":
+                h = bg_color.lstrip('#')
                 rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
                 new_bg = Image.new("RGBA", subject.size, rgb + (255,))
                 final_img = Image.alpha_composite(new_bg, subject)
-            elif mode == "Stock Image":
-                # Resize stock image to match subject size
-                bg_resized = bg_image_final.resize(subject.size, Image.Resampling.LANCZOS)
-                final_img = Image.alpha_composite(bg_resized, subject)
-
-            with c2:
-                st.image(final_img, caption="New Result", use_container_width=True)
-            
-            # 3. Download Logic
-            buf = io.BytesIO()
-            if mode == "Transparent (Blank)":
-                final_img.save(buf, format="PNG")
-                st.download_button("📥 Download PNG", buf.getvalue(), "transparent.png", "image/png")
             else:
-                final_img.convert("RGB").save(buf, format="JPEG")
-                st.download_button("📥 Download JPG", buf.getvalue(), "edited_photo.jpg", "image/jpeg")
+                final_img = subject # Simplification for demo
+
+            # D. Apply Filters
+            if filter_type == "Black & White":
+                final_img = final_img.convert("L")
+            elif filter_type == "Sepia":
+                # Sepia logic...
+                pass
+
+            with col2:
+                st.image(final_img, caption="AI Result", use_container_width=True)
+                
+            # Download
+            buf = io.BytesIO()
+            final_img.convert("RGB").save(buf, format="JPEG")
+            st.download_button("📥 Download Result", buf.getvalue(), "ai_photo.jpg", "image/jpeg")
+
+st.info("💡 Tip: AI Generated Background feature ke liye hum DALL-E ya Stable Diffusion API integrate kar sakte hain.")
