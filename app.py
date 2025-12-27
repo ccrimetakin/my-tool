@@ -1,98 +1,105 @@
 import streamlit as st
 from rembg import remove
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance
 import io
 import requests
+import urllib.parse
 
-# Page Config
+# Page UI Config
 st.set_page_config(page_title="AI Photo Studio Max", layout="wide")
 
-# Advanced CSS
+# Custom CSS for Professional Look
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: white; }
-    .stButton>button { background: linear-gradient(45deg, #FF4B2B, #FF416C); color: white; border: none; border-radius: 5px; height: 50px; font-weight: bold; width: 100%; }
-    .stSidebar { background-color: #161b22; }
-    div[data-testid="stExpander"] { background: #1f2937; border-radius: 10px; border: none; }
+    .main { background-color: #0e1117; }
+    .stButton>button { background: linear-gradient(45deg, #00dbde 0%, #fc00ff 100%); color: white; border: none; font-weight: bold; width: 100%; border-radius: 10px; }
+    .stDownloadButton>button { background-color: #28a745; color: white; width: 100%; border-radius: 10px; }
+    div[data-testid="stSidebar"] { background-color: #161b22; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("✨ AI Photo Studio Max")
-st.write("Advance AI tools se apni photo ko modify karein.")
+st.title("🚀 AI Photo Studio Max (Free Edition)")
+st.write("AI se background hatayein aur naya **AI Background** generate karein!")
 
-# --- Sidebar: Tools & Filters ---
-st.sidebar.header("🛠️ Editor Tools")
-
-# 1. Background Logic
-bg_mode = st.sidebar.selectbox("Background Mode:", ["Transparent", "Solid Color", "Stock Image", "AI Generated (Coming Soon)"])
+# --- Sidebar ---
+st.sidebar.header("🎨 Design Tools")
+mode = st.sidebar.selectbox("Background Type:", ["Transparent", "Solid Color", "AI Magic Generate"])
 
 bg_color = "#ffffff"
-if bg_mode == "Solid Color":
-    bg_color = st.sidebar.color_picker("Pick a Color", "#0000FF")
-elif bg_mode == "Stock Image":
-    stock = st.sidebar.selectbox("Select Theme:", ["Luxury Office", "Cyberpunk City", "Nature", "Studio Minimal"])
-    # Links setup yahan honge...
+ai_prompt = ""
 
-# 2. Color Effects (Brightness, Contrast, etc.)
-st.sidebar.subheader("🎨 Color Effects")
-brightness = st.sidebar.slider("Brightness", 0.5, 2.0, 1.0)
-contrast = st.sidebar.slider("Contrast", 0.5, 2.0, 1.0)
-saturation = st.sidebar.slider("Saturation", 0.0, 2.0, 1.0)
-blur = st.sidebar.slider("Blur Effect", 0, 10, 0)
+if mode == "Solid Color":
+    bg_color = st.sidebar.color_picker("Rang Chunein", "#007BFF")
+elif mode == "AI Magic Generate":
+    ai_prompt = st.sidebar.text_area("Kaisa background chahiye? (English mein likhein)", "Luxury office interior, cinematic lighting, 8k")
+    st.sidebar.info("Tip: 'Nature', 'Cyberpunk City', ya 'Modern Studio' try karein.")
 
-# 3. Photo Filters
-filter_type = st.sidebar.selectbox("Apply Filter:", ["None", "Black & White", "Sepia", "Vivid", "Soft Glow"])
+# Color Adjustments
+st.sidebar.subheader("✨ Adjustments")
+bright = st.sidebar.slider("Brightness", 0.5, 2.0, 1.0)
+cont = st.sidebar.slider("Contrast", 0.5, 2.0, 1.0)
 
-# --- Main App ---
-upload = st.file_uploader("Apni Photo Upload Karein", type=["jpg", "png", "jpeg"])
+# --- Main Section ---
+upload = st.file_uploader("Apni Photo Upload karein", type=["jpg", "png", "jpeg"])
 
 if upload:
-    col1, col2 = st.columns(2)
+    c1, c2 = st.columns(2)
     input_img = Image.open(upload)
     
-    with col1:
+    with c1:
         st.image(input_img, caption="Original Photo", use_container_width=True)
 
-    if st.button("Apply Magic ✨"):
-        with st.spinner("AI processing chal rahi hai..."):
-            # A. Remove Background
-            img_bytes = upload.getvalue()
-            res_bytes = remove(img_bytes)
-            subject = Image.open(io.BytesIO(res_bytes)).convert("RGBA")
-
-            # B. Apply Color Enhancements
-            enhancer = ImageEnhance.Brightness(subject)
-            subject = enhancer.enhance(brightness)
-            enhancer = ImageEnhance.Contrast(subject)
-            subject = enhancer.enhance(contrast)
-            enhancer = ImageEnhance.Color(subject)
-            subject = enhancer.enhance(saturation)
+    if st.button("Generate Magic Photo ✨"):
+        with st.spinner("AI Background Generate ho raha hai... (Isme 5-10 sec lag sakte hain)"):
             
-            if blur > 0:
-                subject = subject.filter(ImageFilter.GaussianBlur(blur))
+            # 1. Subject (Person) ka background hatana
+            img_bytes = upload.getvalue()
+            subject_bytes = remove(img_bytes)
+            subject = Image.open(io.BytesIO(subject_bytes)).convert("RGBA")
 
-            # C. Apply Background Mode
-            if bg_mode == "Solid Color":
+            # 2. Enhancements
+            subject = ImageEnhance.Brightness(subject).enhance(bright)
+            subject = ImageEnhance.Contrast(subject).enhance(cont)
+
+            # 3. Background Setup
+            if mode == "Transparent":
+                final_img = subject
+            elif mode == "Solid Color":
                 h = bg_color.lstrip('#')
                 rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
                 new_bg = Image.new("RGBA", subject.size, rgb + (255,))
                 final_img = Image.alpha_composite(new_bg, subject)
-            else:
-                final_img = subject # Simplification for demo
-
-            # D. Apply Filters
-            if filter_type == "Black & White":
-                final_img = final_img.convert("L")
-            elif filter_type == "Sepia":
-                # Sepia logic...
-                pass
-
-            with col2:
-                st.image(final_img, caption="AI Result", use_container_width=True)
+            elif mode == "AI Magic Generate":
+                # AI Image Generation using Pollinations (HuggingFace based)
+                encoded_prompt = urllib.parse.quote(ai_prompt)
+                seed = 42 # Random seed for variety
+                gen_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={subject.width}&height={subject.height}&seed={seed}&nologo=true"
                 
-            # Download
-            buf = io.BytesIO()
-            final_img.convert("RGB").save(buf, format="JPEG")
-            st.download_button("📥 Download Result", buf.getvalue(), "ai_photo.jpg", "image/jpeg")
+                try:
+                    response = requests.get(gen_url)
+                    bg_gen = Image.open(io.BytesIO(response.content)).convert("RGBA")
+                    # Resize generated background to match photo
+                    bg_gen = bg_gen.resize(subject.size, Image.Resampling.LANCZOS)
+                    final_img = Image.alpha_composite(bg_gen, subject)
+                except:
+                    st.error("AI Background generate nahi ho paya. Internet check karein.")
+                    final_img = subject
 
-st.info("💡 Tip: AI Generated Background feature ke liye hum DALL-E ya Stable Diffusion API integrate kar sakte hain.")
+            with c2:
+                st.image(final_img, caption="AI Generated Result", use_container_width=True)
+            
+            # 4. Download
+            buf = io.BytesIO()
+            if mode == "Transparent":
+                final_img.save(buf, format="PNG")
+                btn_label = "📥 Download PNG"
+                m_type = "image/png"
+            else:
+                final_img.convert("RGB").save(buf, format="JPEG")
+                btn_label = "📥 Download JPG"
+                m_type = "image/jpeg"
+                
+            st.download_button(btn_label, buf.getvalue(), "ai_studio_photo.jpg", m_type)
+
+st.divider()
+st.write("© 2025 AI Studio Max | Powered by HuggingFace & Pollinations")
